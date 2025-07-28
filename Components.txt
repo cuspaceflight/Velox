@@ -1,0 +1,4 @@
+DFR0648 0.91" oled
+SMA Connector
+RA-01S/SH (433MHz / 915MHz)
+XIAO ESP32C2

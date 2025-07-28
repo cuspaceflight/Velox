@@ -1,0 +1,2 @@
+ESP32C3 - https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/
+OLED - https://wiki.dfrobot.com/Monochrome%200.91%E2%80%9D128x32%20I2C%20OLED%20Display%20SKU:DFR0648

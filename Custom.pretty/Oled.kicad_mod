@@ -1,0 +1,110 @@
+(footprint "Oled"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(descr "Through hole straight pin header, 1x04, 2.54mm pitch, single row")
+	(tags "Through hole pin header THT 1x04 2.54mm single row")
+	(property "Reference" "REF**"
+		(at 6.42 -5 270)
+		(layer "F.SilkS")
+		(uuid "1281a7be-348c-49c8-82c9-fcbf95e1e845")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Oled"
+		(at 0 -2 0)
+		(layer "F.Fab")
+		(uuid "e1cc38b9-e2f6-4a27-8a5e-010d7269679e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "ccd09cef-43e3-4dc5-bbdd-9fdda58b496b")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "6dec6113-0aff-4589-a3e7-aaeec463df82")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(fp_rect
+		(start -16.5 -8)
+		(end 16.5 12)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "523c19e2-3e03-40e9-ba5b-709514adff8f")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(uuid "432196a5-b8cc-483b-a2dc-bba6e4bf4ef2")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole rect
+		(at 4.04 -6.27 270)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "9f579abe-706a-4375-9dc4-7cc4c526660f")
+	)
+	(pad "2" thru_hole circle
+		(at 1.5 -6.27 270)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "82c32d8c-ec82-497c-b3b3-6aecf34bc8f8")
+	)
+	(pad "3" thru_hole circle
+		(at -1.04 -6.27 270)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "58179943-67d6-4634-93c3-17cc6fbc638d")
+	)
+	(pad "4" thru_hole circle
+		(at -3.58 -6.27 270)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "fb07b15c-af5d-4fc2-a867-d0b02b42a104")
+	)
+	(embedded_fonts no)
+)
