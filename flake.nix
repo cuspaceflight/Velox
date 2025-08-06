@@ -23,6 +23,7 @@
 
           minicom
           cmake
+          esptool
         ];
 
         shellHook = ''

@@ -3,3 +3,5 @@ sdkconfig.old
 .envrc
 .direnv/*
 .cache/*
+compile_commands.json
+.gitconfig
