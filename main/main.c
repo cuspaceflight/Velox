@@ -1,43 +1,99 @@
-#include "esp_chip_info.h"
-#include "esp_flash.h"
-#include "esp_system.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include <inttypes.h>
-#include <sdkconfig.h>
+/*
+ * SPDX-FileCopyrightText: 2010-2022 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: CC0-1.0
+ */
+
+#include "esp_http_server.h"
+#include "esp_log.h"
+#include "esp_wifi.h"
+#include "sdkconfig.h"
 #include <stdio.h>
+
+#define ESP_WIFI_SSID "esp_tutorial"
+#define ESP_WIFI_PASS "test_esp"
+#define ESP_WIFI_CHANNEL 1
+#define MAX_STA_CONN 2
+
+static const char* TAG = "Basic HTTP Server";
+
+static void wifi_event_handler(
+    void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    printf("Event %ld!\n", event_id);
+}
+
+void wifi_init_softap()
+{
+    esp_netif_init();
+    esp_event_loop_create_default();
+    esp_netif_create_default_wifi_ap();
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT(); // always start with this
+
+    esp_wifi_init(&cfg);
+
+    esp_event_handler_instance_register(
+        WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL);
+
+    wifi_config_t wifi_config = {
+        .ap = {
+            .ssid = ESP_WIFI_SSID,
+            .ssid_len = strlen(ESP_WIFI_SSID),
+            .channel = ESP_WIFI_CHANNEL,
+            .password = ESP_WIFI_PASS,
+            .max_connection = MAX_STA_CONN,
+            .authmode = WIFI_AUTH_WPA2_PSK,
+            .pmf_cfg = {
+                .required = true,
+            },
+        },
+    };
+
+    esp_wifi_set_mode(WIFI_MODE_AP);
+    esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
+    esp_wifi_start();
+
+    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:%s channel:%d", ESP_WIFI_SSID,
+        ESP_WIFI_PASS, ESP_WIFI_CHANNEL);
+}
+
+/* An HTTP GET handler */
+static esp_err_t hello_get_handler(httpd_req_t* req)
+{
+    const char* resp_str = "<h1>Hello World</h1>";
+    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+static const httpd_uri_t hello_world_uri
+    = { .uri = "/", .method = HTTP_GET, .handler = hello_get_handler, .user_ctx = NULL };
+
+httpd_handle_t start_webserver()
+{
+    httpd_handle_t server = NULL;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    // config.lru_purge_enable = true;
+
+    if (httpd_start(&server, &config) == ESP_OK) {
+        ESP_LOGI(TAG, "Server ok, registering the URI handlers...");
+        httpd_register_uri_handler(server, &hello_world_uri);
+        // To add additional route:
+        // httpd_register_uri_handler(server, &handler_function);
+        return server;
+    }
+    ESP_LOGI(TAG, "Error starting server");
+    return NULL;
+}
 
 void app_main(void)
 {
-    printf("Hello, World!\n");
-    esp_chip_info_t chip_info;
-    uint32_t flash_size;
-    esp_chip_info(&chip_info);
+    printf("Hello tutorial!\n");
 
-    printf("This is %s chip with %d CPU core(s), %s%s%s%s, ", CONFIG_IDF_TARGET, chip_info.cores,
-        (chip_info.features & CHIP_FEATURE_WIFI_BGN) ? "WiFi/" : "",
-        (chip_info.features & CHIP_FEATURE_BT) ? "BT" : "",
-        (chip_info.features & CHIP_FEATURE_BLE) ? "BLE" : "",
-        (chip_info.features & CHIP_FEATURE_IEEE802154) ? "802.15.4" : "");
-
-    unsigned major_rev = chip_info.revision / 100;
-    unsigned minor_rev = chip_info.revision % 100;
-    printf("silicon revision v%d.%d, ", major_rev, minor_rev);
-    if (esp_flash_get_size(NULL, &flash_size) != ESP_OK) {
-        printf("Get flash size failed");
-        return;
-    }
-
-    printf("%" PRIu32 "MB %s flash\n", flash_size / (uint32_t)(1024 * 1024),
-        (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
-
-    printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
-
-    for (int i = 10; i >= 0; i--) {
-        printf("Restarting in %d seconds...\n", i);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-    printf("Restarting now.\n");
-    fflush(stdout);
-    esp_restart();
+    ESP_LOGI(TAG, "ESP_WIFI_MODE_AP");
+    printf("Event WIFI_EVENT_AP_STACONNECTED %d\n", WIFI_EVENT_AP_STACONNECTED);
+    wifi_init_softap();
+    httpd_handle_t server = start_webserver();
+    // To stop it:
+    // httpd_stop(server);
 }
