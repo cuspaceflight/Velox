@@ -1,3 +1,4 @@
+#include "driver/spi_master.h"
 #include "lora.h"
 #include "soc/gpio_num.h"
 #include <esp_log.h>
@@ -11,8 +12,8 @@ lora_device device = {
     .freq = 433E6,
     .mosi = GPIO_NUM_10,
     .miso = GPIO_NUM_9,
-    .cs   = GPIO_NUM_2,
     .sck  = GPIO_NUM_8,
+    .cs   = GPIO_NUM_2,
     .rst  = GPIO_NUM_3,
 };
 
@@ -20,12 +21,10 @@ void task_rx(void* p)
 {
     int x;
     for (;;) {
-        lora_receive(&device);
-        while (lora_received(&device)) {
-            x      = lora_receive_packet(&device, buf, sizeof(buf));
+        while (lora_received_packet(&device)) {
+            x      = lora_read_packet(&device, buf, sizeof(buf));
             buf[x] = 0;
             printf("Recevied: %s\n", buf);
-            lora_receive(&device);
         }
         vTaskDelay(1);
     }
@@ -34,12 +33,12 @@ void task_rx(void* p)
 void app_main()
 {
     if (!lora_init(&device)) {
-        ESP_LOGE("LORA", "Failed to initialize");
+        ESP_LOGE("LoRa", "Failed to initialize");
         return;
     }
+    ESP_LOGI("LoRa", "Started LoRa");
 
-    lora_set_frequency(&device, 433E6);
+    lora_receive(&device);
 
-    lora_dump_registers(&device);
-    // xTaskCreate(&task_rx, "task_rx", 2048, NULL, 5, NULL);
+    xTaskCreate(&task_rx, "task_rx", 2048, NULL, 5, NULL);
 }

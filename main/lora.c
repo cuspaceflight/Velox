@@ -7,86 +7,183 @@
 #include "esp_log.h"
 #include "esp_rom_gpio.h"
 #include "freertos/idf_additions.h"
+#include "hal/gpio_types.h"
 #include "soc/gpio_struct.h"
+#include "string.h"
 
-// Registers
-#define REG_FIFO                 0x00
-#define REG_OP_MODE              0x01
-#define REG_FRF_MSB              0x06
-#define REG_FRF_MID              0x07
-#define REG_FRF_LSB              0x08
-#define REG_PA_CONFIG            0x09
-#define REG_LNA                  0x0C
-#define REG_FIFO_ADDR_PTR        0x0D
-#define REG_FIFO_TX_BASE_ADDR    0x0E
-#define REG_FIFO_RX_BASE_ADDR    0x0F
-#define REG_FIFO_RX_CURRENT_ADDR 0x10
-#define REG_IRQ_FLAGS            0x12
-#define REG_RX_NB_BYTES          0x13
-#define REG_PKT_SNR_VALUE        0x19
-#define REG_PKT_RSSI_VALUE       0x1A
-#define REG_MODEM_CONFIG_1       0x1D
-#define REG_MODEM_CONFIG_2       0x1E
-#define REG_PREAMBLE_MSB         0x20
-#define REG_PREAMBLE_LSB         0x21
-#define REG_PAYLOAD_LENGTH       0x22
-#define REG_MODEM_CONFIG_3       0x26
-#define REG_RSSI_WIDEBAND        0x2C
-#define REG_DETECTION_OPTIMIZE   0x31
-#define REG_DETECTION_THRESHOLD  0x37
-#define REG_SYNC_WORD            0x39
-#define REG_DIO_MAPPING_1        0x40
-#define REG_VERSION              0x42 // 0x12
+#define CMD_SET_SLEEP                0x84
+#define CMD_SET_STANDBY              0x80
+#define CMD_SET_FS                   0xC1
+#define CMD_SET_TX                   0x83
+#define CMD_SET_RX                   0x82
+#define CMD_STOP_TIMER_ON_PREAMBLE   0x9F
+#define CMD_SET_RX_DUTY_CYCLE        0x94
+#define CMD_SET_CAD                  0xC5
+#define CMD_SET_TX_CONTINUOUS_WAVE   0xD1
+#define CMD_SET_TX_INFINITE_PREAMBLE 0xD2
+#define CMD_SET_REGULATOR_MODE       0x96
+#define CMD_CALIBRATE                0x89
+#define CMD_CALIBRATE_IMAGE          0x98
+#define CMD_SET_PA_CONFIG            0x95
+#define CMD_SET_RX_TX_FALLBACK_MODE  0x93
 
-// Modes
-#define MODE_LONG_RANGE_MODE 0x80
-#define MODE_SLEEP           0x00
-#define MODE_STDBY           0x01
-#define MODE_TX              0x03
-#define MODE_RX_CONTINUOUS   0x05
-#define MODE_RX_SINGLE       0x05
+#define CMD_WRITE_REGISTER 0x0D
+#define CMD_READ_REGISTER  0x1D
+#define CMD_WRITE_BUFFER   0x0E
+#define CMD_READ_BUFFER    0x1E
 
-// IRQ
-#define IRQ_RX_DONE_MASK 0x40
+#define CMD_DIO_IRQ_PARAMS             0x08
+#define CMD_GET_IRQ_STATUS             0x12
+#define CMD_CLEAR_IRQ_STATUS           0x02
+#define CMD_SET_DIO2_AS_RF_SWITCH_CTRL 0x9D
+#define CMD_SET_DIO3_AS_TCXO_CTRL      0x97
 
-#define VERSION_TIMEOUT_RESET 100
+#define CMD_SET_RF_FREQUENCY      0x86
+#define CMD_SET_PACKET_TYPE       0x8A
+#define CMD_GET_PACKET_TYPE       0x11
+#define CMD_SET_TX_PARAMS         0x8E
+#define CMD_SET_MODULATION_PARAMS 0x8B
 
-#define READ_REG  0x7F
-#define WRITE_REG 0x80
+#define CMD_SET_PACKET_PARAMS         0x8C
+#define CMD_SET_CAD_PARAMS            0x88
+#define CMD_SET_BUFFER_BASE_ADDRESS   0x8F
+#define CMD_SET_LORA_SYMB_NUM_TIMEOUT 0xA0
 
-void lora_write_reg(const lora_device* device, int reg, int val)
+#define CMD_GET_STATUS           0xC0
+#define CMD_GET_RSS_INST         0x15
+#define CMD_GET_RX_BUFFER_STATUS 0x13
+#define CMD_GET_PACKET_STATUS    0x14
+#define CMD_GET_DEVICE_ERRORS    0x17
+#define CMD_CLEAR_DEVICE_ERRORS  0x07
+#define CMD_GET_STATS            0x10
+#define CMD_RESET_STATS          0x00
+
+// #define REG_WHITENING_INITIAL_VALUE_MSB 0x06B8
+// #define REG_WHITENING_INITIAL_VALUE_LSB 0x06B9
+#define REG_LORA_SYNC_WORD_MSB 0x0740
+#define REG_LORA_SYNC_WORD_LSB 0x0741
+#define REG_RNG_0              0x0819
+#define REG_RNG_1              0x081A
+#define REG_RNG_2              0x081B
+#define REG_RNG_3              0x081C
+#define REG_RX_GAIN            0x08AC
+#define REG_OCP_CONF           0x08E7
+#define REG_XTA_TRIM           0x0911
+#define REG_XTB_TRIM           0x0912
+
+#define SYNC_WORD_PRIVATE 0x1424
+#define SYNC_WORD_PUBLIC  0x3444
+
+#define IRQ_ALL               0b1111111111
+#define IRQ_TX_DONE           1 << 0
+#define IRQ_RX_DONE           1 << 1
+#define IRQ_PREAMBLE_DETECTED 1 << 2
+#define IRQ_SYNC_WORD_VALID   1 << 3
+#define IRQ_HEADER_VALId      1 << 4
+#define IRQ_HEADER_ERR        1 << 5
+#define IRQ_CRC_ERR           1 << 6
+#define IRQ_CAD_DONE          1 << 7
+#define IRQ_CAD_DETECTED      1 << 8
+#define IRQ_TIMEOUT           1 << 9
+
+#define XTAL_FREQ 32000000.0
+#define FREQ_DIV  (double)(1 << 25);
+#define FREQ_MUL  (double)(XTAL_FREQ / FREQ_DIV)
+
+#define PACKET_TYPE_GFSK 0x00
+#define PACKET_TYPE_LORA 0x01
+
+#define TAG "LoRa"
+
+void read_spi(const lora_device* device, uint8_t* tx, uint8_t* rx, uint8_t buf_size)
 {
-    uint8_t out[2] = { reg | WRITE_REG, val };
-    uint8_t in[2];
+    ESP_LOGV(TAG, "READ_SPI");
     spi_transaction_t t = {
-        .flags     = SPI_TRANS_USE_TXDATA,
-        .length    = 8 * sizeof(out),
-        .tx_buffer = out,
-        .rx_buffer = in,
+        .length    = 8 * buf_size,
+        .tx_buffer = tx,
+        .rx_buffer = rx,
     };
 
-    ESP_ERROR_CHECK(spi_device_transmit(device->__spi, &t));
+    spi_device_transmit(device->__spi, &t);
 }
 
-int lora_read_reg(const lora_device* device, int reg)
+void write_spi(const lora_device* device, uint8_t* tx, uint8_t buf_size)
 {
-    uint8_t out[2] = { READ_REG & reg, 0x00 };
-    uint8_t in[2];
-
+    ESP_LOGV(TAG, "WRITE_SPI");
     spi_transaction_t t = {
-        .flags     = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA,
-        .length    = 8 * sizeof(out),
-        .tx_buffer = out,
-        .rx_buffer = in,
+        .length    = 8 * buf_size,
+        .tx_buffer = tx,
+        .rx_buffer = NULL,
     };
 
-    ESP_ERROR_CHECK(spi_device_transmit(device->__spi, &t));
+    spi_device_transmit(device->__spi, &t);
+}
 
-    return in[1];
+void read_register(const lora_device* device, uint16_t addr, uint8_t* buf, uint8_t buf_size)
+{
+    ESP_LOGV(TAG, "READ_REG: 0x%04X", addr);
+    uint8_t data[16];
+    memset(data, 0, sizeof(data));
+    data[0] = CMD_READ_REGISTER;
+    data[1] = (addr >> 8) & 0xFF;
+    data[2] = addr & 0xFF;
+    read_spi(device, data, data, buf_size + 4);
+
+    memcpy(buf, data + 4, buf_size);
+}
+
+uint8_t read_buffer(const lora_device* device, uint8_t* rx_buf, uint8_t len)
+{
+    ESP_LOGV(TAG, "READ_BUFFER");
+    uint8_t payload_length;
+    uint8_t payload_offset;
+    lora_get_buffer_status(device, &payload_length, &payload_offset);
+
+    if (payload_length > len) {
+        ESP_LOGW(TAG, "ReadBuffer too small. Payload:%d buf:%d", payload_length, len);
+        return 0;
+    }
+
+    uint8_t* buf = malloc(payload_length + 3);
+    if (buf != NULL) {
+        buf[0] = CMD_READ_BUFFER;
+        buf[1] = payload_offset;
+        buf[2] = 0x0;
+        memset(&buf[3], 0x0, payload_length);
+        read_spi(device, buf, buf, payload_length + 3);
+        memcpy(rx_buf, &buf[3], payload_length);
+        free(buf);
+    } else {
+        ESP_LOGE(TAG, "ReadBuffer malloc fail");
+        payload_length = 0;
+    }
+
+    return payload_length;
+}
+
+void write_register(const lora_device* device, uint16_t addr, uint8_t* buf, uint8_t buf_size)
+{
+    ESP_LOGV(TAG, "WRITE_REG: 0x%04X", addr);
+    uint8_t data[16];
+
+    memset(data, 0, sizeof(data));
+    data[0] = CMD_WRITE_REGISTER;
+    data[1] = (addr >> 8) & 0xFF;
+    data[2] = addr & 0xFF;
+    memcpy(data + 3, buf, buf_size);
+    write_spi(device, data, buf_size + 3);
 }
 
 int lora_init(lora_device* device)
 {
+    ESP_LOGI("LORA", "MISO_GPIO=%d", device->miso);
+    ESP_LOGI("LORA", "MOSI_GPIO=%d", device->mosi);
+    ESP_LOGI("LORA", "SCK_GPIO=%d", device->sck);
+    ESP_LOGI("LORA", "CS_GPIO=%d", device->cs);
+    ESP_LOGI("LORA", "RST_GPIO=%d", device->rst);
+    ESP_LOGI("LORA", "BUSY_GPIO=%d", device->busy);
+    ESP_LOGV(TAG, "INIT");
+
     gpio_reset_pin(device->rst);
     gpio_set_direction(device->rst, GPIO_MODE_OUTPUT);
 
@@ -94,137 +191,155 @@ int lora_init(lora_device* device)
     gpio_set_direction(device->cs, GPIO_MODE_OUTPUT);
     gpio_set_level(device->cs, 1);
 
+    gpio_reset_pin(device->busy);
+    gpio_set_direction(device->busy, GPIO_MODE_INPUT);
+
     spi_bus_config_t bus = {
-        .miso_io_num     = device->miso,
-        .mosi_io_num     = device->mosi,
-        .sclk_io_num     = device->sck,
-        .quadwp_io_num   = -1,
-        .quadhd_io_num   = -1,
-        .max_transfer_sz = 0,
+        .miso_io_num   = device->miso,
+        .mosi_io_num   = device->mosi,
+        .sclk_io_num   = device->sck,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
     };
 
-    ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO));
+    ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_DISABLED));
 
     spi_device_interface_config_t dev = {
-        .clock_speed_hz = 8E6,
+        .clock_speed_hz = 1E5,
         .mode           = 0,
         .spics_io_num   = device->cs,
-        .queue_size     = 7,
-        .flags          = 0,
+        .queue_size     = 2,
     };
     ESP_ERROR_CHECK(spi_bus_add_device(SPI2_HOST, &dev, &device->__spi));
 
     lora_reset(device);
 
-    lora_dump_registers(device);
+    uint8_t buf[2] = { 0x0, 0x0 };
+    read_register(device, REG_LORA_SYNC_WORD_MSB, buf, 2);
+    uint16_t sync_word = (buf[0] << 8) | buf[1];
 
-    uint8_t version;
-    uint8_t i = 0;
-    while (i++ < VERSION_TIMEOUT_RESET) {
-        version = lora_read_reg(device, REG_VERSION);
-
-        ESP_LOGD("LORA", "version=0x%02x", version);
-
-        if (version == 0x12)
-            break;
-
-        vTaskDelay(2);
+    if (sync_word != SYNC_WORD_PUBLIC && sync_word != SYNC_WORD_PRIVATE) {
+        ESP_LOGE(TAG, "Possibly no SPI Connection. Sync: 0x%04X. Expected 0x%04X or 0x%04X",
+            sync_word, SYNC_WORD_PUBLIC, SYNC_WORD_PRIVATE);
+        return 1;
     }
-    ESP_LOGD("LORA", "i=%d, TIMEOUT_RESET=%d", i, VERSION_TIMEOUT_RESET);
-    if (i >= VERSION_TIMEOUT_RESET + 1)
-        return 0;
+    ESP_LOGI(TAG, "Sync Word: 0x%04X", sync_word);
 
-    lora_sleep(device);
-    lora_write_reg(device, REG_FIFO_RX_BASE_ADDR, 0);
-    lora_write_reg(device, REG_FIFO_TX_BASE_ADDR, 0);
-    lora_write_reg(device, REG_LNA, lora_read_reg(device, REG_LNA) | 0x03);
-    lora_write_reg(device, REG_MODEM_CONFIG_3, 0x04);
-
-    lora_idle(device);
+    lora_set_packet_type(device, PACKET_TYPE_LORA);
     lora_set_frequency(device, device->freq);
+    lora_set_buffer_base(device, 0x0, 0x0);
+    // lora_set_modulation_params(device, ...);
+    // lora_set_packet_params(device, ...);
+    // lora_set_dio_irq_params(device, ...);
 
     return 1;
 }
 
-void lora_idle(const lora_device* device)
+void lora_reset(const lora_device* device)
 {
-    lora_write_reg(device, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_STDBY);
+    ESP_LOGV(TAG, "RESET");
+    gpio_set_level(device->rst, 0);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    gpio_set_level(device->rst, 1);
+    vTaskDelay(pdMS_TO_TICKS(100));
 }
 
-void lora_sleep(const lora_device* device)
+void lora_set_packet_type(const lora_device* device, uint8_t packet_type)
 {
-    lora_write_reg(device, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP);
+    ESP_LOGV(TAG, "SET_PACKET_TYPE: %d", packet_type);
+    uint8_t data[2] = { CMD_SET_PACKET_TYPE, packet_type };
+    write_spi(device, data, 2);
+}
+
+uint8_t lora_get_packet_type(const lora_device* device)
+{
+    ESP_LOGV(TAG, "GET_PACKET_TYPE");
+    uint8_t data[3] = { CMD_GET_PACKET_TYPE, 0x0, 0x0 };
+    read_spi(device, data, data, 3);
+    return data[2];
+}
+
+void lora_set_frequency(lora_device* device, uint32_t freq)
+{
+    ESP_LOGV(TAG, "SET_FREQ: %ld", freq);
+    device->freq = freq;
+
+    uint8_t buf[5] = { CMD_SET_RF_FREQUENCY, 0x0, 0x0, 0x0, 0x0 };
+
+    uint32_t rf = (uint32_t)(freq * XTAL_FREQ);
+    buf[1]      = (rf >> 24) & 0xFF;
+    buf[2]      = (rf >> 16) & 0xFF;
+    buf[3]      = (rf >> 8) & 0xFF;
+    buf[4]      = (rf >> 0) & 0xFF;
+
+    write_spi(device, buf, 5);
+}
+
+void lora_set_buffer_base(const lora_device* device, uint8_t tx_base, uint8_t rx_base)
+{
+    ESP_LOGV(TAG, "SET_BUFFER_BASE: TX: %d, RX: %d", tx_base, rx_base);
+    uint8_t buf[3] = { CMD_SET_BUFFER_BASE_ADDRESS, tx_base, rx_base };
+
+    write_spi(device, buf, 3);
+}
+
+void lora_get_buffer_status(
+    const lora_device* device, uint8_t* payload_length, uint8_t* rx_start_buffer)
+{
+    ESP_LOGV(TAG, "GET_BUFFER_STATUS");
+    uint8_t buf[4] = { CMD_GET_RX_BUFFER_STATUS, 0x0, 0x0, 0x0 };
+    read_spi(device, buf, buf, 4);
+    *payload_length  = buf[2];
+    *rx_start_buffer = buf[3];
+}
+
+void lora_standby(const lora_device* device)
+{
+    ESP_LOGV(TAG, "STANDBY");
+    uint8_t buf[2] = { CMD_SET_STANDBY, 0x0 };
+    write_spi(device, buf, 2);
 }
 
 void lora_receive(const lora_device* device)
 {
-    lora_write_reg(device, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS);
+    ESP_LOGV(TAG, "RECEIVE");
+    uint8_t buf[4] = { CMD_SET_RX, 0xFF, 0xFF, 0xFF };
+    write_spi(device, buf, 4);
 }
 
-void lora_reset(const lora_device* device)
+uint8_t lora_received_packet(const lora_device* device)
 {
-    gpio_set_level(device->rst, 0);
-    vTaskDelay(pdMS_TO_TICKS(1));
-    gpio_set_level(device->rst, 1);
-    vTaskDelay(pdMS_TO_TICKS(10));
+    ESP_LOGV(TAG, "RECEIVED_PACKET");
+    uint16_t irq = lora_get_irq_status(device);
+    return (irq & IRQ_RX_DONE);
 }
 
-void lora_set_frequency(lora_device* device, uint64_t frequency)
+uint8_t lora_read_packet(const lora_device* device, uint8_t* data, uint8_t len)
 {
-    device->freq = frequency;
-    uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
-    lora_write_reg(device, REG_FRF_MSB, (uint8_t)(frf >> 16));
-    lora_write_reg(device, REG_FRF_MID, (uint8_t)(frf >> 8));
-    lora_write_reg(device, REG_FRF_LSB, (uint8_t)(frf >> 0));
-}
+    ESP_LOGV(TAG, "READ_PACKET");
+    uint16_t irq = lora_get_irq_status(device);
+    if (irq & IRQ_RX_DONE) {
+        lora_clear_irq_status(device, IRQ_ALL);
+        uint8_t read_length = read_buffer(device, data, len);
 
-void lora_set_sync_word(const lora_device* device, int sw)
-{
-    lora_write_reg(device, REG_SYNC_WORD, sw);
-}
-
-int lora_receive_packet(const lora_device* device, uint8_t* buf, int size)
-{
-    int len = 0;
-
-    int irq = lora_read_reg(device, REG_IRQ_FLAGS);
-    lora_write_reg(device, REG_IRQ_FLAGS, irq);
-    if ((irq & IRQ_RX_DONE_MASK) == 0)
-        return 0;
-
-    len = lora_read_reg(device, REG_RX_NB_BYTES);
-
-    lora_idle(device);
-    lora_write_reg(device, REG_FIFO_ADDR_PTR, lora_read_reg(device, REG_FIFO_RX_CURRENT_ADDR));
-    if (len > size)
-        len = size;
-    for (int i = 0; i < len; i++) {
-        *buf++ = lora_read_reg(device, REG_FIFO);
+        return read_length;
     }
 
-    return len;
-}
-
-int lora_received(const lora_device* device)
-{
-    if (lora_read_reg(device, REG_IRQ_FLAGS) & IRQ_RX_DONE_MASK)
-        return 1;
     return 0;
 }
 
-int lora_packet_rssi(const lora_device* device)
+uint16_t lora_get_irq_status(const lora_device* device)
 {
-    return (lora_read_reg(device, REG_PKT_RSSI_VALUE) - (device->freq < 868E6 ? 164 : 157));
+    ESP_LOGV(TAG, "GET_IRQ_STATUS");
+    uint8_t buf[4] = { CMD_GET_IRQ_STATUS, 0x0, 0x0, 0x0 };
+    read_spi(device, buf, buf, 4);
+
+    return (((uint16_t)buf[2]) << 8) | buf[3];
 }
 
-void lora_dump_registers(const lora_device* device)
+void lora_clear_irq_status(const lora_device* device, uint16_t irq)
 {
-    int i;
-    printf("00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n");
-    for (i = 0; i < 0x40; i++) {
-        printf("%02X ", lora_read_reg(device, i));
-        if ((i & 0x0F) == 0x0F)
-            printf("\n");
-    }
-    printf("\n");
+    ESP_LOGV(TAG, "CLEAR_IRQ_STATUS: 0x%X", irq);
+    uint8_t buf[3] = { CMD_CLEAR_IRQ_STATUS, (irq >> 8) & 0xFF, irq & 0xFF };
+    write_spi(device, buf, 3);
 }
