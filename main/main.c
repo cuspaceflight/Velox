@@ -45,6 +45,7 @@ void app_main()
     }
     ESP_LOGI("LoRa", "Started LoRa");
 
+    lora_set_byte_sync_word(&lora_dev, 0x36);
     lora_receive(&lora_dev);
 
     oled_init(&oled_dev);

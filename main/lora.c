@@ -50,7 +50,7 @@
 #define CMD_SET_LORA_SYMB_NUM_TIMEOUT 0xA0
 
 #define CMD_GET_STATUS           0xC0
-#define CMD_GET_RSS_INST         0x15
+#define CMD_GET_RSSI_INST        0x15
 #define CMD_GET_RX_BUFFER_STATUS 0x13
 #define CMD_GET_PACKET_STATUS    0x14
 #define CMD_GET_DEVICE_ERRORS    0x17
@@ -85,6 +85,13 @@
 #define IRQ_CAD_DONE          1 << 7
 #define IRQ_CAD_DETECTED      1 << 8
 #define IRQ_TIMEOUT           1 << 9
+
+#define HEADER_TYPE_EXP 0x0
+#define HEADER_TYPE_IMP 0x1
+#define CRC_OFF         0x0
+#define CRC_ON          0x1
+#define IQ_STANDARD     0x0
+#define IQ_INVERT       0x1
 
 #define XTAL_FREQ 32000000.0
 #define FREQ_DIV  (double)(1 << 25);
@@ -229,7 +236,7 @@ int lora_init(lora_device* device)
     lora_set_frequency(device, device->freq);
     lora_set_buffer_base(device, 0x0, 0x0);
     // lora_set_modulation_params(device, ...);
-    // lora_set_packet_params(device, ...);
+    lora_set_packet_params(device, 0x02, HEADER_TYPE_EXP, 0xFF, CRC_ON, IQ_STANDARD);
     // lora_set_dio_irq_params(device, ...);
 
     return 1;
@@ -342,4 +349,61 @@ void lora_clear_irq_status(const lora_device* device, uint16_t irq)
     ESP_LOGV(TAG, "CLEAR_IRQ_STATUS: 0x%X", irq);
     uint8_t buf[3] = { CMD_CLEAR_IRQ_STATUS, (irq >> 8) & 0xFF, irq & 0xFF };
     write_spi(device, buf, 3);
+}
+
+void lora_set_packet_params(const lora_device* device, uint16_t preamble_length,
+    uint8_t header_type, uint8_t payload_length, uint8_t crc_type, int8_t invert_iq)
+{
+    ESP_LOGV(TAG,
+        "SET_PACKET_PARAMS: PREAMBLE_LENGTH:%d HEADER_TYPE: %d PAYLOAD_LENGTH %d CRC_TYPE: %d "
+        "INVERT_IQ:%d",
+        preamble_length, header_type, payload_length, crc_type, invert_iq);
+
+    uint8_t data[10] = { CMD_SET_PACKET_PARAMS, (preamble_length >> 8) & 0xFF,
+        preamble_length & 0xFF, header_type, payload_length, crc_type, invert_iq, 0x0, 0x0, 0x0 };
+    write_spi(device, data, 10);
+}
+
+void lora_get_packet_status(
+    const lora_device* device, uint8_t* rssi_pkt, uint8_t* snr_pkt, uint8_t* signal_rssi_pkt)
+{
+    uint8_t data[5] = { CMD_GET_PACKET_STATUS, 0x0, 0x0, 0x0, 0x0 };
+    read_spi(device, data, data, 5);
+
+    if (rssi_pkt != NULL)
+        *rssi_pkt = data[2];
+
+    if (snr_pkt != NULL)
+        *snr_pkt = data[3];
+
+    if (signal_rssi_pkt != NULL)
+        *signal_rssi_pkt = data[4];
+}
+
+int8_t lora_get_packet_rssi(const lora_device* device)
+{
+    uint8_t rssi = lora_get_packet_status(device, &rssi, NULL, NULL);
+    return -((int8_t)rssi) / 2;
+}
+
+int8_t lora_get_rssi_inst(const lora_device* device)
+{
+    uint8_t data[3] = { CMD_GET_RSSI_INST, 0x0, 0x0 };
+    read_spi(device, data, data, 3);
+
+    return -((int8_t)data[2]) / 2;
+}
+
+void lora_set_sync_word(const lora_device* device, uint16_t sync_word)
+{
+    uint8_t buf[1] = { (sync_word >> 8) & 0xFF };
+    write_register(device, REG_LORA_SYNC_WORD_MSB, buf, 1);
+    buf[0] = sync_word & 0xFF;
+    write_register(device, REG_LORA_SYNC_WORD_LSB, buf, 1);
+}
+
+void lora_set_byte_sync_word(const lora_device* device, uint8_t sync_word)
+{
+    // Set Sync word to 0xY4Z4 where sync_word has the form 0xYZ
+    lora_set_sync_word(device, ((uint16_t)(sync_word & 0xF0) << 8) | (sync_word & 0x0F) | 0x0404);
 }
