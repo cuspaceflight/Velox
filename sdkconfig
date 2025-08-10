@@ -465,6 +465,20 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# General Settings
+#
+
+#
+# LoRa
+#
+CONFIG_LORA_FREQ_433MHZ=y
+# CONFIG_LORA_FREQ_838MHZ is not set
+CONFIG_LORA_FREQ=433000000
+CONFIG_LORA_SYNC_WORD=0x36
+# end of LoRa
+# end of General Settings
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y

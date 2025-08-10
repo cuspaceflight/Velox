@@ -382,7 +382,8 @@ void lora_get_packet_status(
 
 int8_t lora_get_packet_rssi(const lora_device* device)
 {
-    uint8_t rssi = lora_get_packet_status(device, &rssi, NULL, NULL);
+    uint8_t rssi;
+    lora_get_packet_status(device, &rssi, NULL, NULL);
     return -((int8_t)rssi) / 2;
 }
 

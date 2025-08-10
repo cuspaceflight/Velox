@@ -11,7 +11,7 @@
 uint8_t buf[32];
 
 lora_device lora_dev = {
-    .freq = 433E6,
+    .freq = CONFIG_LORA_FREQ,
     .mosi = GPIO_NUM_10,
     .miso = GPIO_NUM_9,
     .sck  = GPIO_NUM_8,
@@ -45,7 +45,7 @@ void app_main()
     }
     ESP_LOGI("LoRa", "Started LoRa");
 
-    lora_set_byte_sync_word(&lora_dev, 0x36);
+    lora_set_byte_sync_word(&lora_dev, CONFIG_LORA_SYNC_WORD);
     lora_receive(&lora_dev);
 
     oled_init(&oled_dev);

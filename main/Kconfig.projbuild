@@ -1,0 +1,25 @@
+mainmenu "General Settings"
+
+    menu "General Settings"
+        menu "LoRa"
+            choice LORA_FREQ_CHOICE
+                prompt "LoRa Frequency"
+                default LORA_FREQ_433MHZ
+
+                config LORA_FREQ_433MHZ
+                    bool "433MHz"
+
+                config LORA_FREQ_838MHZ
+                    bool "838MHz"
+            endchoice
+
+            config LORA_FREQ
+                int
+                default 433000000 if LORA_FREQ_433MHZ
+                default 838000000 if LORA_FREQ_838MHZ
+
+            config LORA_SYNC_WORD
+                hex "LoRa sync word"
+                default 0x36
+        endmenu
+    endmenu
