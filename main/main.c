@@ -10,7 +10,7 @@
 
 uint8_t buf[32];
 
-lora_device lora_dev = {
+lora_config lora_conf = {
     .freq = CONFIG_LORA_FREQ,
     .mosi = GPIO_NUM_10,
     .miso = GPIO_NUM_9,
@@ -18,18 +18,20 @@ lora_device lora_dev = {
     .cs   = GPIO_NUM_2,
     .rst  = GPIO_NUM_3,
 };
+lora_handle lora;
 
-oled_device oled_dev = {
+oled_config oled_dev = {
     .sda = GPIO_NUM_6,
     .scl = GPIO_NUM_7,
 };
+oled_handle oled;
 
 void task_rx(void* p)
 {
     int x;
     for (;;) {
-        while (lora_received_packet(&lora_dev)) {
-            x      = lora_read_packet(&lora_dev, buf, sizeof(buf));
+        while (lora_received_packet(&lora)) {
+            x      = lora_read_packet(&lora, buf, sizeof(buf));
             buf[x] = 0;
             printf("Recevied: %s\n", buf);
         }
@@ -39,16 +41,18 @@ void task_rx(void* p)
 
 void app_main()
 {
-    if (!lora_init(&lora_dev)) {
+    if (!lora_init(lora_conf, &lora)) {
         ESP_LOGE("LoRa", "Failed to initialize");
         return;
     }
     ESP_LOGI("LoRa", "Started LoRa");
 
-    lora_set_byte_sync_word(&lora_dev, CONFIG_LORA_SYNC_WORD);
-    lora_receive(&lora_dev);
+    lora_set_byte_sync_word(&lora, CONFIG_LORA_SYNC_WORD);
+    lora_receive(&lora);
 
-    oled_init(&oled_dev);
+    oled_init(oled_dev, &oled);
+
+    oled_clear_display(&oled, true);
 
     xTaskCreate(&task_rx, "task_rx", 2048, NULL, 5, NULL);
 }
