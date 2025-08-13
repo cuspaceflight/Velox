@@ -36,5 +36,9 @@ void oled_init(const oled_config config, oled_handle* handle);
 void oled_display_image(
     const oled_handle* handle, uint8_t page, uint8_t segment, const uint8_t* image, uint8_t width);
 
+void oled_set_pixel(const oled_handle* handle, uint8_t y, uint8_t x, bool value);
+
+void oled_set_text(const oled_handle* handle, uint8_t page, uint8_t segment, const char* str, ...);
+
 void oled_display(const oled_handle* handle);
 void oled_clear_display(const oled_handle* handle, bool invert);

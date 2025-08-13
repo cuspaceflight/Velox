@@ -1,9 +1,12 @@
 #include "oled.h"
 
+#include "fonts.h"
+
 #include "string.h"
 #include <driver/i2c.h>
 #include <driver/i2c_master.h>
 #include <esp_log.h>
+#include <stdio.h>
 
 #define OLED_ADDR         0x3C
 #define OLED_WIDTH        128
@@ -157,11 +160,46 @@ void oled_display_image(
     memcpy(&handle->context->page[page].segment[segment], image, width);
 }
 
+void oled_set_pixel(const oled_handle* handle, uint8_t y, uint8_t x, bool value)
+{
+    oled_page* page = &handle->context->page[3 - y / 8];
+    if (value) {
+        page->segment[x] |= 1 << (y % 8);
+    } else {
+        page->segment[x] &= ~(1 << (y % 8));
+    }
+}
+
 void oled_display(const oled_handle* handle)
 {
     for (uint8_t page = 0; page < handle->context->pages; page++) {
         oled_display_image(
             handle, page, 0, handle->context->page[page].segment, handle->context->width);
+    }
+}
+
+void oled_set_text(const oled_handle* handle, uint8_t page, uint8_t segment, const char* str, ...)
+{
+    va_list args;
+    va_start(args, str);
+    char buf[25];
+    int length = vsnprintf(buf, 25, str, args);
+    va_end(args);
+
+    ESP_LOGI(TAG, "OLED_SET_TEXT: STR: %.*s", length, buf);
+
+    uint8_t index = 0;
+    for (int k = 0; k < length; k++) {
+        int x = segment + k * 6;
+
+        unsigned char* font = console_font_5x8 + buf[index++] * 8;
+        for (int i = 0; i < 5; i++) {
+            uint8_t seg = 0;
+            for (int j = 0; j < 8; j++) {
+                seg |= ((font[j] >> (7 - i)) & 0x1) << (7 - j);
+            }
+            handle->context->page[3 - page].segment[x + i] = seg;
+        }
     }
 }
 

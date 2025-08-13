@@ -1,7 +1,10 @@
 #include "lora.h"
 #include "oled.h"
 
+#include <string.h>
+
 #include "driver/spi_master.h"
+#include "sdkconfig.h"
 #include "soc/gpio_num.h"
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -47,12 +50,31 @@ void app_main()
     }
     ESP_LOGI("LoRa", "Started LoRa");
 
-    lora_set_byte_sync_word(&lora, CONFIG_LORA_SYNC_WORD);
+    // lora_set_byte_sync_word(&lora, CONFIG_LORA_SYNC_WORD);
     lora_receive(&lora);
 
     oled_init(oled_dev, &oled);
 
-    oled_clear_display(&oled, true);
+    oled_clear_display(&oled, false);
+
+    // oled_set_pixel(&oled, 0, 0, true);
+    // oled_set_pixel(&oled, 0, 1, true);
+    // oled_set_pixel(&oled, 1, 0, true);
+    // oled_set_pixel(&oled, 1, 1, true);
+
+    oled_set_text(&oled, 0, 0, "Hello, World!");
+    oled_set_text(&oled, 0, 15 * 6, "%dMHz", (CONFIG_LORA_FREQ) / (uint32_t)1e6);
+    oled_display(&oled);
+
+    // uint8_t page[OLED_PAGE_SEGMENT_SIZE];
+    // for (int i = 0; i < 4; i++) {
+    //     for (int j = 0; j < 128 / 4; j++) {
+    //         for (int k = 0; k < 4; k++) {
+    //             page[j * 4 + k] = (j % 2 == 0) ? 0xF0 : 0x0F;
+    //         }
+    //     }
+    //     oled_display_image(&oled, i, 0, page, OLED_PAGE_SEGMENT_SIZE);
+    // }
 
     xTaskCreate(&task_rx, "task_rx", 2048, NULL, 5, NULL);
 }
