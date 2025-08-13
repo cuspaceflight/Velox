@@ -325,7 +325,7 @@ uint8_t lora_received_packet(const lora_handle* handle)
 
 uint8_t lora_read_packet(const lora_handle* handle, uint8_t* data, uint8_t len)
 {
-    ESP_LOGV(TAG, "READ_PACKET");
+    ESP_LOGI(TAG, "READ_PACKET");
     uint16_t irq = lora_get_irq_status(handle);
     if (irq & IRQ_RX_DONE) {
         lora_clear_irq_status(handle, IRQ_ALL);
@@ -403,10 +403,12 @@ void lora_set_sync_word(const lora_handle* handle, uint16_t sync_word)
     write_register(handle, REG_LORA_SYNC_WORD_MSB, buf, 1);
     buf[0] = sync_word & 0xFF;
     write_register(handle, REG_LORA_SYNC_WORD_LSB, buf, 1);
+    ESP_LOGI(TAG, "Sync Word: %04X", sync_word);
 }
 
 void lora_set_byte_sync_word(const lora_handle* handle, uint8_t sync_word)
 {
     // Set Sync word to 0xY4Z4 where sync_word has the form 0xYZ
-    lora_set_sync_word(handle, ((uint16_t)(sync_word & 0xF0) << 8) | (sync_word & 0x0F) | 0x0404);
+    lora_set_sync_word(
+        handle, ((uint16_t)(sync_word & 0xF0) << 8) | ((sync_word & 0x0F) << 4) | 0x0404);
 }
