@@ -130,8 +130,6 @@ uint8_t read_buffer(const lora_handle* handle, uint8_t* rx_buf, uint8_t len)
     uint8_t payload_offset;
     lora_get_rx_buffer_status(handle, &payload_length, &payload_offset);
 
-    ESP_LOGI(TAG, "Payload Length: %d, Payload Offset: %d\n", payload_length, payload_offset);
-
     if (payload_length > len) {
         ESP_LOGW(TAG, "ReadBuffer too small. Payload:%d buf:%d", payload_length, len);
         return 0;
