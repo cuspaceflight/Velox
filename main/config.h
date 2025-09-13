@@ -1,7 +1,7 @@
 #pragma once
 
-#include "lora.h"
-#include "oled.h"
+#include "lora/lora.h"
+#include "oled/oled.h"
 
 typedef struct lora_message_t {
     float gps_lat;

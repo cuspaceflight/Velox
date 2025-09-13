@@ -1,8 +1,8 @@
 idf_component_register(
   SRCS
   "main.c"
-  "lora.c"
-  "oled.c"
+  "lora/lora.c"
+  "oled/oled.c"
   PRIV_REQUIRES
   driver
   esp_driver_gpio

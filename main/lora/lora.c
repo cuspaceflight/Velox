@@ -1,5 +1,7 @@
 #include "lora.h"
 
+#include "lora_defines.h"
+
 #include <math.h>
 
 #include "driver/gpio.h"
@@ -61,8 +63,6 @@
 #define CMD_GET_STATS            0x10
 #define CMD_RESET_STATS          0x00
 
-// #define REG_WHITENING_INITIAL_VALUE_MSB 0x06B8
-// #define REG_WHITENING_INITIAL_VALUE_LSB 0x06B9
 #define REG_LORA_SYNC_WORD_MSB 0x0740
 #define REG_LORA_SYNC_WORD_LSB 0x0741
 #define REG_RNG_0              0x0819
@@ -77,56 +77,12 @@
 #define SYNC_WORD_PRIVATE 0x1424
 #define SYNC_WORD_PUBLIC  0x3444
 
-#define IRQ_ALL               0b1111111111
-#define IRQ_TX_DONE           1 << 0
-#define IRQ_RX_DONE           1 << 1
-#define IRQ_PREAMBLE_DETECTED 1 << 2
-#define IRQ_SYNC_WORD_VALID   1 << 3
-#define IRQ_HEADER_VALId      1 << 4
-#define IRQ_HEADER_ERR        1 << 5
-#define IRQ_CRC_ERR           1 << 6
-#define IRQ_CAD_DONE          1 << 7
-#define IRQ_CAD_DETECTED      1 << 8
-#define IRQ_TIMEOUT           1 << 9
-
-#define HEADER_TYPE_EXP 0x0
-#define HEADER_TYPE_IMP 0x1
-#define CRC_OFF         0x0
-#define CRC_ON          0x1
-#define IQ_STANDARD     0x0
-#define IQ_INVERT       0x1
-
 #define XTAL_FREQ 32000000.0
 #define FREQ_DIV  (double)(pow(2.0, 25.0))
 #define FREQ_MUL  (double)(XTAL_FREQ / FREQ_DIV)
 
 #define PACKET_TYPE_GFSK 0x00
 #define PACKET_TYPE_LORA 0x01
-
-#define MOD_SF5  0x05
-#define MOD_SF6  0x06
-#define MOD_SF7  0x07
-#define MOD_SF8  0x08
-#define MOD_SF9  0x09
-#define MOD_SF10 0x0A
-#define MOD_SF11 0x0B
-#define MOD_SF12 0x0C
-
-#define MOD_BW_7   0x00
-#define MOD_BW_10  0x08
-#define MOD_BW_15  0x01
-#define MOD_BW_20  0x09
-#define MOD_BW_31  0x02
-#define MOD_BW_41  0x0A
-#define MOD_BW_62  0x03
-#define MOD_BW_125 0x04
-#define MOD_BW_250 0x05
-#define MOD_BW_500 0x06
-
-#define MOD_CR_4_5 0x01
-#define MOD_CR_4_6 0x02
-#define MOD_CR_4_7 0x03
-#define MOD_CR_4_8 0x04
 
 #define TAG "LoRa"
 
@@ -269,9 +225,9 @@ int lora_init(const lora_config config, lora_handle* handle)
     lora_set_packet_type(handle, PACKET_TYPE_LORA);
     lora_set_frequency(handle, config.freq);
     lora_set_buffer_base(handle, 0x0, 0x0);
-    lora_set_mod_params(handle, MOD_SF11, MOD_BW_125, MOD_CR_4_5);
-    lora_set_packet_params(handle, 8, HEADER_TYPE_EXP, 0xFF, CRC_ON, IQ_STANDARD);
-    lora_set_dio_irq_params(handle, IRQ_ALL);
+    lora_set_mod_params(handle, LORA_SF11, LORA_BW_125, LORA_CR_4_5);
+    lora_set_packet_params(handle, 8, LORA_HEADER_TYPE_EXP, 0xFF, LORA_CRC_ON, LORA_IQ_STANDARD);
+    lora_set_dio_irq_params(handle, LORA_IRQ_ALL);
 
     lora_receive(handle);
 
@@ -354,15 +310,15 @@ uint8_t lora_received_packet(const lora_handle* handle)
 {
     ESP_LOGV(TAG, "RECEIVED_PACKET");
     uint16_t irq = lora_get_irq_status(handle);
-    return (irq & IRQ_RX_DONE);
+    return (irq & LORA_IRQ_RX_DONE);
 }
 
 uint8_t lora_read_packet(const lora_handle* handle, uint8_t* data, uint8_t len)
 {
     ESP_LOGI(TAG, "READ_PACKET");
     uint16_t irq = lora_get_irq_status(handle);
-    if (irq & IRQ_RX_DONE) {
-        lora_clear_irq_status(handle, IRQ_ALL);
+    if (irq & LORA_IRQ_RX_DONE) {
+        lora_clear_irq_status(handle, LORA_IRQ_ALL);
         uint8_t read_length = read_buffer(handle, data, len);
 
         return read_length;

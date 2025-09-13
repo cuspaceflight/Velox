@@ -1,6 +1,6 @@
 #include "config.h"
-#include "lora.h"
-#include "oled.h"
+#include "lora/lora.h"
+#include "oled/oled.h"
 
 #include <string.h>
 
