@@ -225,8 +225,9 @@ int lora_init(const lora_config config, lora_handle* handle)
     lora_set_packet_type(handle, PACKET_TYPE_LORA);
     lora_set_frequency(handle, config.freq);
     lora_set_buffer_base(handle, 0x0, 0x0);
-    lora_set_mod_params(handle, LORA_SF11, LORA_BW_125, LORA_CR_4_5);
-    lora_set_packet_params(handle, 8, LORA_HEADER_TYPE_EXP, 0xFF, LORA_CRC_ON, LORA_IQ_STANDARD);
+    lora_set_mod_params(handle, CONFIG_LORA_SF, CONFIG_LORA_BW, CONFIG_LORA_CR);
+    lora_set_packet_params(handle, CONFIG_LORA_PREAMBLE_LENGTH, CONFIG_LORA_IMPLICIT_HEADER, 0xFF,
+        CONFIG_LORA_CRC, CONFIG_LORA_INVERT_IQ);
     lora_set_dio_irq_params(handle, LORA_IRQ_ALL);
 
     lora_receive(handle);

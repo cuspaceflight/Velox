@@ -57,9 +57,7 @@ void app_main()
 
     lora_receive(&lora);
 
-    lora_set_byte_sync_word(&lora, 0x34);
-    uint16_t sync_word = lora_get_sync_word(&lora);
-    ESP_LOGI("LoRa", "Get Sync word: %04X", sync_word);
+    lora_set_byte_sync_word(&lora, CONFIG_LORA_SYNC_WORD);
 
     oled_init(oled_dev, &oled);
 

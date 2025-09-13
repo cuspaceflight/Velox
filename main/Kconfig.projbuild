@@ -2,8 +2,12 @@ mainmenu "General Settings"
 
     menu "General Settings"
         menu "LoRa"
+            config LORA_SYNC_WORD
+                hex "LoRa sync word"
+                default 0x36
+
             choice LORA_FREQ_CHOICE
-                prompt "LoRa Frequency"
+                prompt "Frequency"
                 default LORA_FREQ_433MHZ
 
                 config LORA_FREQ_433MHZ
@@ -13,13 +17,140 @@ mainmenu "General Settings"
                     bool "838MHz"
             endchoice
 
+            choice LORA_SF_CHOICE
+                prompt "Spreading Factor"
+                default LORA_SF_11
+
+                config LORA_SF_5
+                    bool "SF5"
+                config LORA_SF_6
+                    bool "SF6"
+                config LORA_SF_7
+                    bool "SF7"
+                config LORA_SF_8
+                    bool "SF8"
+                config LORA_SF_9
+                    bool "SF9"
+                config LORA_SF_10
+                    bool "SF10"
+                config LORA_SF_11
+                    bool "SF11"
+                config LORA_SF_12
+                    bool "SF12"
+            endchoice
+
+            choice LORA_BW_CHOICE
+                prompt "Bandwidth"
+                default LORA_BW_125
+
+                config LORA_BW_7
+                    bool "7.81 kHz"
+                config LORA_BW_10
+                    bool "10.42 kHz"
+                config LORA_BW_15
+                    bool "15.63 kHz"
+                config LORA_BW_20
+                    bool "20.83 kHz"
+                config LORA_BW_31
+                    bool "31.26 kHz"
+                config LORA_BW_41
+                    bool "41.67 kHz"
+                config LORA_BW_62
+                    bool "62.50 kHz"
+                config LORA_BW_125
+                    bool "125 kHz"
+                config LORA_BW_250
+                    bool "250 kHz"
+                config LORA_BW_500
+                    bool "500 kHz"
+            endchoice
+
+            choice LORA_CR_CHOICE
+                prompt "Coding Rate"
+                default LORA_CR_4_5
+
+                config LORA_CR_4_5
+                    bool "4/5"
+                config LORA_CR_4_6
+                    bool "4/6"
+                config LORA_CR_4_7
+                    bool "4/7"
+                config LORA_CR_4_8
+                    bool "4/8"
+            endchoice
+
+            config LORA_PREAMBLE_LENGTH
+                prompt "Preamble Length"
+                int
+                default 8
+                range 4 16
+
+            config LORA_IMPLICIT_HEADER_CHOICE
+                prompt "Implicit Header"
+                bool
+                default n
+
+            config LORA_CRC_CHOICE
+                prompt "Enable CRC"
+                bool
+                default y
+
+            config LORA_INVERT_IQ_CHOICE
+                prompt "Invert IQ"
+                bool
+                default n
+
+
             config LORA_FREQ
                 int
                 default 433000000 if LORA_FREQ_433MHZ
                 default 838000000 if LORA_FREQ_838MHZ
 
-            config LORA_SYNC_WORD
-                hex "LoRa sync word"
-                default 0x36
+            config LORA_SF
+                int
+                default  5 if LORA_SF_5
+                default  6 if LORA_SF_6
+                default  7 if LORA_SF_7
+                default  8 if LORA_SF_8
+                default  9 if LORA_SF_9
+                default 10 if LORA_SF_10
+                default 11 if LORA_SF_11
+                default 12 if LORA_SF_12
+
+            config LORA_BW
+                hex
+                default 0x00 if LORA_BW_7
+                default 0x08 if LORA_BW_10
+                default 0x01 if LORA_BW_15
+                default 0x09 if LORA_BW_20
+                default 0x02 if LORA_BW_31
+                default 0x0A if LORA_BW_41
+                default 0x03 if LORA_BW_62
+                default 0x04 if LORA_BW_125
+                default 0x05 if LORA_BW_250
+                default 0x06 if LORA_BW_500
+
+            config LORA_CR
+                int
+                default 1 if LORA_CR_4_5
+                default 2 if LORA_CR_4_6
+                default 3 if LORA_CR_4_7
+                default 4 if LORA_CR_4_8
+
+
+            config LORA_IMPLICIT_HEADER
+                int
+                default 0 if !LORA_IMPLICIT_HEADER_CHOICE
+                default 1 if LORA_IMPLICIT_HEADER_CHOICE
+
+            config LORA_CRC
+                int
+                default 0 if !LORA_CRC_CHOICE
+                default 1 if LORA_CRC_CHOICE
+
+            config LORA_INVERT_IQ
+                int
+                default 0 if !LORA_INVERT_IQ_CHOICE
+                default 1 if LORA_INVERT_IQ_CHOICE
         endmenu
     endmenu
