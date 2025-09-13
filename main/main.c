@@ -21,6 +21,7 @@ lora_config lora_conf = {
     .sck  = GPIO_NUM_8,
     .cs   = GPIO_NUM_2,
     .rst  = GPIO_NUM_3,
+    .busy = GPIO_NUM_4,
 };
 lora_handle lora;
 
@@ -38,15 +39,9 @@ void task_rx(void* p)
             x      = lora_read_packet(&lora, buf, sizeof(buf));
             buf[x] = 0;
 
-            int8_t rssi = lora_get_packet_rssi(&lora);
-
-            lora_message* received_message = (lora_message*)((void*)buf);
-
-            oled_clear_display(&oled, false);
-            render_oled(&lora, &oled, received_message);
-            oled_display(&oled);
-
-            printf("Recevied: %s\n", buf);
+            int8_t rssi;
+            lora_get_packet_status(&lora, &rssi, NULL, NULL);
+            printf("Recevied: %s | RSSI: %d\n", buf, rssi);
         }
         vTaskDelay(1);
     }
@@ -61,6 +56,10 @@ void app_main()
     ESP_LOGI("LoRa", "Started LoRa");
 
     lora_receive(&lora);
+
+    lora_set_byte_sync_word(&lora, 0x34);
+    uint16_t sync_word = lora_get_sync_word(&lora);
+    ESP_LOGI("LoRa", "Get Sync word: %04X", sync_word);
 
     oled_init(oled_dev, &oled);
 

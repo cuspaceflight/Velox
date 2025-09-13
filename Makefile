@@ -1,15 +1,16 @@
-PORT=/dev/ttyACM0
-
 build: FORCE
 	idf.py build
 
 flash:
-	idf.py -p ${PORT} flash
+	idf.py flash
 
 monitor:
-	idf.py -p ${PORT} monitor
+	idf.py monitor
 
 flash_monitor:
-	idf.py -p ${PORT} flash monitor
+	idf.py flash monitor
+
+menuconfig:
+	idf.py menuconfig
 
 FORCE: ;

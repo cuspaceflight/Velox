@@ -1,10 +1,13 @@
 #include "lora.h"
 
+#include <math.h>
+
 #include "driver/gpio.h"
 #include "driver/spi_common.h"
 #include "driver/spi_master.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_log_level.h"
 #include "esp_rom_gpio.h"
 #include "freertos/idf_additions.h"
 #include "hal/gpio_types.h"
@@ -94,11 +97,36 @@
 #define IQ_INVERT       0x1
 
 #define XTAL_FREQ 32000000.0
-#define FREQ_DIV  (double)(1 << 25);
+#define FREQ_DIV  (double)(pow(2.0, 25.0))
 #define FREQ_MUL  (double)(XTAL_FREQ / FREQ_DIV)
 
 #define PACKET_TYPE_GFSK 0x00
 #define PACKET_TYPE_LORA 0x01
+
+#define MOD_SF5  0x05
+#define MOD_SF6  0x06
+#define MOD_SF7  0x07
+#define MOD_SF8  0x08
+#define MOD_SF9  0x09
+#define MOD_SF10 0x0A
+#define MOD_SF11 0x0B
+#define MOD_SF12 0x0C
+
+#define MOD_BW_7   0x00
+#define MOD_BW_10  0x08
+#define MOD_BW_15  0x01
+#define MOD_BW_20  0x09
+#define MOD_BW_31  0x02
+#define MOD_BW_41  0x0A
+#define MOD_BW_62  0x03
+#define MOD_BW_125 0x04
+#define MOD_BW_250 0x05
+#define MOD_BW_500 0x06
+
+#define MOD_CR_4_5 0x01
+#define MOD_CR_4_6 0x02
+#define MOD_CR_4_7 0x03
+#define MOD_CR_4_8 0x04
 
 #define TAG "LoRa"
 
@@ -144,7 +172,9 @@ uint8_t read_buffer(const lora_handle* handle, uint8_t* rx_buf, uint8_t len)
     ESP_LOGV(TAG, "READ_BUFFER");
     uint8_t payload_length;
     uint8_t payload_offset;
-    lora_get_buffer_status(handle, &payload_length, &payload_offset);
+    lora_get_rx_buffer_status(handle, &payload_length, &payload_offset);
+
+    ESP_LOGI(TAG, "Payload Length: %d, Payload Offset: %d\n", payload_length, payload_offset);
 
     if (payload_length > len) {
         ESP_LOGW(TAG, "ReadBuffer too small. Payload:%d buf:%d", payload_length, len);
@@ -152,18 +182,18 @@ uint8_t read_buffer(const lora_handle* handle, uint8_t* rx_buf, uint8_t len)
     }
 
     uint8_t* buf = malloc(payload_length + 3);
-    if (buf != NULL) {
-        buf[0] = CMD_READ_BUFFER;
-        buf[1] = payload_offset;
-        buf[2] = 0x0;
-        memset(&buf[3], 0x0, payload_length);
-        read_spi(handle, buf, buf, payload_length + 3);
-        memcpy(rx_buf, &buf[3], payload_length);
-        free(buf);
-    } else {
+    if (!buf) {
         ESP_LOGE(TAG, "ReadBuffer malloc fail");
-        payload_length = 0;
+        return 0;
     }
+
+    buf[0] = CMD_READ_BUFFER;
+    buf[1] = payload_offset;
+    buf[2] = 0x0;
+    memset(&buf[3], 0x0, payload_length);
+    read_spi(handle, buf, buf, payload_length + 3);
+    memcpy(rx_buf, &buf[3], payload_length);
+    free(buf);
 
     return payload_length;
 }
@@ -234,12 +264,16 @@ int lora_init(const lora_config config, lora_handle* handle)
     }
     ESP_LOGI(TAG, "Sync Word: 0x%04X", sync_word);
 
+    lora_standby(handle);
+
     lora_set_packet_type(handle, PACKET_TYPE_LORA);
     lora_set_frequency(handle, config.freq);
     lora_set_buffer_base(handle, 0x0, 0x0);
-    // lora_set_modulation_params(handle, ...);
-    lora_set_packet_params(handle, 0x02, HEADER_TYPE_EXP, 0xFF, CRC_ON, IQ_STANDARD);
-    // lora_set_dio_irq_params(handle, ...);
+    lora_set_mod_params(handle, MOD_SF11, MOD_BW_125, MOD_CR_4_5);
+    lora_set_packet_params(handle, 8, HEADER_TYPE_EXP, 0xFF, CRC_ON, IQ_STANDARD);
+    lora_set_dio_irq_params(handle, IRQ_ALL);
+
+    lora_receive(handle);
 
     return 1;
 }
@@ -275,7 +309,7 @@ void lora_set_frequency(lora_handle* handle, uint32_t freq)
 
     uint8_t buf[5] = { CMD_SET_RF_FREQUENCY, 0x0, 0x0, 0x0, 0x0 };
 
-    uint32_t rf = (uint32_t)(freq * XTAL_FREQ);
+    uint32_t rf = (uint32_t)(freq / FREQ_MUL);
     buf[1]      = (rf >> 24) & 0xFF;
     buf[2]      = (rf >> 16) & 0xFF;
     buf[3]      = (rf >> 8) & 0xFF;
@@ -292,7 +326,7 @@ void lora_set_buffer_base(const lora_handle* handle, uint8_t tx_base, uint8_t rx
     write_spi(handle, buf, 3);
 }
 
-void lora_get_buffer_status(
+void lora_get_rx_buffer_status(
     const lora_handle* handle, uint8_t* payload_length, uint8_t* rx_start_buffer)
 {
     ESP_LOGV(TAG, "GET_BUFFER_STATUS");
@@ -339,7 +373,7 @@ uint8_t lora_read_packet(const lora_handle* handle, uint8_t* data, uint8_t len)
 
 uint16_t lora_get_irq_status(const lora_handle* handle)
 {
-    ESP_LOGV(TAG, "GET_IRQ_STATUS");
+    // ESP_LOGV(TAG, "GET_IRQ_STATUS");
     uint8_t buf[4] = { CMD_GET_IRQ_STATUS, 0x0, 0x0, 0x0 };
     read_spi(handle, buf, buf, 4);
 
@@ -367,26 +401,26 @@ void lora_set_packet_params(const lora_handle* handle, uint16_t preamble_length,
 }
 
 void lora_get_packet_status(
-    const lora_handle* handle, uint8_t* rssi_pkt, uint8_t* snr_pkt, uint8_t* signal_rssi_pkt)
+    const lora_handle* handle, int8_t* rssi, int8_t* snr, int8_t* signal_rssi)
 {
     uint8_t data[5] = { CMD_GET_PACKET_STATUS, 0x0, 0x0, 0x0, 0x0 };
     read_spi(handle, data, data, 5);
 
-    if (rssi_pkt != NULL)
-        *rssi_pkt = data[2];
+    if (rssi != NULL)
+        *rssi = -((int8_t)data[2]) / 2;
 
-    if (snr_pkt != NULL)
-        *snr_pkt = data[3];
+    if (snr != NULL)
+        *snr = ((int8_t)data[3]) / 4;
 
-    if (signal_rssi_pkt != NULL)
-        *signal_rssi_pkt = data[4];
+    if (signal_rssi != NULL)
+        *signal_rssi = -data[4] / 2;
 }
 
 int8_t lora_get_packet_rssi(const lora_handle* handle)
 {
-    uint8_t rssi;
+    int8_t rssi;
     lora_get_packet_status(handle, &rssi, NULL, NULL);
-    return -((int8_t)rssi) / 2;
+    return rssi;
 }
 
 int8_t lora_get_rssi_inst(const lora_handle* handle)
@@ -411,4 +445,33 @@ void lora_set_byte_sync_word(const lora_handle* handle, uint8_t sync_word)
     // Set Sync word to 0xY4Z4 where sync_word has the form 0xYZ
     lora_set_sync_word(
         handle, ((uint16_t)(sync_word & 0xF0) << 8) | ((sync_word & 0x0F) << 4) | 0x0404);
+}
+
+uint16_t lora_get_sync_word(const lora_handle* handle)
+{
+    uint8_t buf[1];
+    uint16_t sync_word = 0;
+    read_register(handle, REG_LORA_SYNC_WORD_MSB, buf, 1);
+    sync_word = buf[0] << 8;
+    read_register(handle, REG_LORA_SYNC_WORD_LSB, buf, 1);
+    sync_word |= buf[0];
+
+    return sync_word;
+}
+
+void lora_set_mod_params(const lora_handle* handle, uint8_t sf, uint8_t bw, uint8_t cr)
+{
+    ESP_LOGV(TAG, "SET_MOD_PARAMS: SF: %d BW: %d CR %d", sf, bw, cr);
+
+    uint8_t data[9] = { CMD_SET_MODULATION_PARAMS, sf, bw, cr, 0, 0, 0, 0, 0 };
+    write_spi(handle, data, 9);
+}
+
+void lora_set_dio_irq_params(const lora_handle* handle, uint16_t irq_mask)
+{
+    ESP_LOGV(TAG, "SET_DIO_IRQ: IRQ_MASK: %x", irq_mask);
+
+    uint8_t data[9]
+        = { CMD_DIO_IRQ_PARAMS, (irq_mask >> 8) & 0xFF, (irq_mask) & 0xFF, 0, 0, 0, 0, 0, 0 };
+    write_spi(handle, data, 9);
 }
