@@ -153,4 +153,24 @@ mainmenu "General Settings"
                 default 0 if !LORA_INVERT_IQ_CHOICE
                 default 1 if LORA_INVERT_IQ_CHOICE
         endmenu
+
+        menu Web
+            config WEB_WIFI_SSID
+                string "WiFi SSID"
+                default "Velox Ground Station"
+
+            config WEB_WIFI_PASSWORD
+                string "WiFi Password"
+                default "Password"
+
+            config WEB_WIFI_CHANNEL
+                int "WiFi channel"
+                range 1 13
+                default 1
+
+            config WEB_MAX_STA_CONN
+                int "Maximal STA connections"
+                default 4
+
+        endmenu
     endmenu

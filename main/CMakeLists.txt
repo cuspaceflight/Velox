@@ -3,8 +3,11 @@ idf_component_register(
   "main.c"
   "lora/lora.c"
   "oled/oled.c"
+  "webserver.c"
   PRIV_REQUIRES
   driver
   esp_driver_gpio
+  esp_wifi
+  esp_http_server
   INCLUDE_DIRS
   "")

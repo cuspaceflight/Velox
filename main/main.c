@@ -1,6 +1,8 @@
 #include "config.h"
 #include "lora/lora.h"
 #include "oled/oled.h"
+#include "web_files.h"
+#include "webserver.h"
 
 #include <string.h>
 
@@ -65,6 +67,8 @@ void app_main()
 
     oled_clear_display(&oled, false);
     oled_display(&oled);
+
+    setup_web_server();
 
     xTaskCreate(&task_rx, "task_rx", 4096, NULL, 5, NULL);
 }
