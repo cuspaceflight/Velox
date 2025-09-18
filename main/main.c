@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "driver/spi_master.h"
+#include "esp_http_server.h"
 #include "sdkconfig.h"
 #include "soc/gpio_num.h"
 #include <esp_log.h>
@@ -14,7 +15,10 @@
 #include <freertos/task.h>
 #include <stdio.h>
 
+#define STRLEN 512
+
 uint8_t buf[64];
+char strbuf[STRLEN];
 
 lora_config lora_conf = {
     .freq = CONFIG_LORA_FREQ,
@@ -51,6 +55,13 @@ void task_rx(void* p)
     }
 }
 
+esp_err_t send_web_data(httpd_req_t* req)
+{
+    ESP_LOGI("GENERAL", "Web Data Send");
+    format_json(receive_message, strbuf, STRLEN);
+    return httpd_resp_send(req, strbuf, HTTPD_RESP_USE_STRLEN);
+}
+
 void app_main()
 {
     if (!lora_init(lora_conf, &lora)) {
@@ -68,7 +79,7 @@ void app_main()
     oled_clear_display(&oled, false);
     oled_display(&oled);
 
-    setup_web_server();
+    setup_web_server(send_web_data);
 
     xTaskCreate(&task_rx, "task_rx", 4096, NULL, 5, NULL);
 }

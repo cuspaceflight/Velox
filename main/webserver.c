@@ -32,7 +32,9 @@ esp_err_t send_web_page(httpd_req_t* req)
 httpd_uri_t uri_get
     = { .uri = "/", .method = HTTP_GET, .handler = send_web_page, .user_ctx = NULL };
 
-void setup_web_server()
+httpd_uri_t uri_data = { .uri = "/data", .method = HTTP_GET, .handler = NULL, .user_ctx = NULL };
+
+void setup_web_server(esp_err_t (*data_handler)(httpd_req_t*))
 {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -75,6 +77,9 @@ void setup_web_server()
     if (httpd_start(&server, &config) == ESP_OK) {
         ESP_LOGI(TAG, "Adding URI handlers");
         ESP_ERROR_CHECK(httpd_register_uri_handler(server, &uri_get));
+
+        uri_data.handler = data_handler;
+        ESP_ERROR_CHECK(httpd_register_uri_handler(server, &uri_data));
     }
     ESP_LOGI(TAG, "Setup http Server");
 }
