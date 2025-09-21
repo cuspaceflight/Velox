@@ -44,15 +44,21 @@ typedef struct lora_message_t {
 
 void render_oled(const lora_handle* lora, const oled_handle* oled, const lora_message message)
 {
+    static float s_gps_lat = 0.0f, s_gps_lon = 0.0f, s_gps_alt = 0.0f;
+
+    if (message.gps_lat != 0.0f) {
+        s_gps_lat = message.gps_lat;
+        s_gps_lon = message.gps_lon;
+        s_gps_alt = message.gps_alt;
+    }
+
     int8_t rssi = lora_get_packet_rssi(lora);
-    oled_set_text(oled, 0, 15 * 6, "%dMHz", (lora->freq) / (uint32_t)1e6);
+    oled_set_text(oled, 3, 15 * 6, "%dMHz", (lora->freq) / (uint32_t)1e6);
 
-    oled_set_text(oled, 0, 0, "LAT : %08.4f", message.gps_lat);
-    oled_set_text(oled, 1, 0, "LON : %08.4f", message.gps_lon);
-    oled_set_text(oled, 2, 0, "ALT : %08.4f", message.gps_alt);
+    oled_set_text(oled, 0, 0, "LAT : %-9.6f", s_gps_lat);
+    oled_set_text(oled, 1, 0, "LON : %-9.6f", s_gps_lon);
+    oled_set_text(oled, 2, 0, "ALT : %-9.6f", s_gps_alt);
     oled_set_text(oled, 3, 0, "RSSI: %-3d", rssi);
-
-    oled_set_text(oled, 3, 10 * 6, "TEMP: %-03.1f", message.mpu_temp);
 }
 
 void format_json(const lora_message message, char* str, int len)

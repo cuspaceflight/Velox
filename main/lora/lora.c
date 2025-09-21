@@ -362,13 +362,13 @@ void lora_get_packet_status(
     read_spi(handle, data, data, 5);
 
     if (rssi != NULL)
-        *rssi = -((int8_t)data[2]) / 2;
+        *rssi = -((int8_t)data[2] / 2);
 
     if (snr != NULL)
         *snr = ((int8_t)data[3]) / 4;
 
     if (signal_rssi != NULL)
-        *signal_rssi = -data[4] / 2;
+        *signal_rssi = -(data[4] / 2);
 }
 
 int8_t lora_get_packet_rssi(const lora_handle* handle)
