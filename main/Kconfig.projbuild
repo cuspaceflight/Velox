@@ -13,8 +13,8 @@ mainmenu "General Settings"
                 config LORA_FREQ_433MHZ
                     bool "433MHz"
 
-                config LORA_FREQ_838MHZ
-                    bool "838MHz"
+                config LORA_FREQ_868MHZ
+                    bool "868MHz"
             endchoice
 
             choice LORA_SF_CHOICE
@@ -104,7 +104,7 @@ mainmenu "General Settings"
             config LORA_FREQ
                 int
                 default 433000000 if LORA_FREQ_433MHZ
-                default 838000000 if LORA_FREQ_838MHZ
+                default 868000000 if LORA_FREQ_868MHZ
 
             config LORA_SF
                 int
