@@ -55,6 +55,31 @@ void task_rx(void* p)
     }
 }
 
+// void task_tx(void* p)
+// {
+//     int counter = 0;
+//     char message[255];
+//     for (;;) {
+//
+//         int len = snprintf(message, 255, "Hello, World: %d\n", counter++);
+//
+//         lora_write_tx_message(&lora, (uint8_t*)message, len);
+//         lora_set_packet_params(&lora, CONFIG_LORA_PREAMBLE_LENGTH, CONFIG_LORA_IMPLICIT_HEADER,
+//         len,
+//             CONFIG_LORA_CRC, CONFIG_LORA_INVERT_IQ);
+//         lora_transmit(&lora, 0);
+//         ESP_LOGI("SEND", "%.*s", len, message);
+//
+//         oled_set_text(&oled, 0, 0, message);
+//         oled_display(&oled);
+//
+//         while (!(lora_get_irq_status(&lora) & LORA_IRQ_TX_DONE)) { }
+//
+//         lora_clear_irq_status(&lora, LORA_IRQ_ALL);
+//         vTaskDelay(100);
+//     }
+// }
+
 esp_err_t send_web_data(httpd_req_t* req)
 {
     ESP_LOGI("GENERAL", "Web Data Send");
@@ -81,5 +106,6 @@ void app_main()
 
     setup_web_server(send_web_data);
 
+    // xTaskCreate(&task_tx, "task_tx", 4096, NULL, 5, NULL);
     xTaskCreate(&task_rx, "task_rx", 4096, NULL, 5, NULL);
 }
