@@ -186,7 +186,7 @@ void oled_set_text(const oled_handle* handle, uint8_t page, uint8_t segment, con
     int length = vsnprintf(buf, 25, str, args);
     va_end(args);
 
-    ESP_LOGI(TAG, "OLED_SET_TEXT: STR: %.*s", length, buf);
+    ESP_LOGV(TAG, "OLED_SET_TEXT: STR: %.*s", length, buf);
 
     uint8_t index = 0;
     for (int k = 0; k < length; k++) {
