@@ -152,6 +152,19 @@ uint8_t read_buffer(const lora_handle* handle, uint8_t* rx_buf, uint8_t len)
     return payload_length;
 }
 
+void write_buffer(const lora_handle* handle, uint8_t offset, const uint8_t* tx_buf, uint8_t len)
+{
+    ESP_LOGV(TAG, "WRITE_BUFFER");
+
+    uint8_t buf[len + 2];
+
+    buf[0] = CMD_WRITE_BUFFER;
+    buf[1] = offset;
+    memcpy(&buf[2], tx_buf, len);
+
+    write_spi(handle, buf, len + 2);
+}
+
 void write_register(const lora_handle* handle, uint16_t addr, uint8_t* buf, uint8_t buf_size)
 {
     ESP_LOGV(TAG, "WRITE_REG: 0x%04X", addr);
@@ -221,6 +234,8 @@ int lora_init(const lora_config config, lora_handle* handle)
     lora_standby(handle);
 
     lora_set_packet_type(handle, PACKET_TYPE_LORA);
+    lora_set_pa_config(
+        handle, 0x04, 0x07, 0x00); // DUTY CYCLE: 0x04, HP_MAX: 0x07, DEVICE_SELECT: sx1262(0x00)
     lora_set_frequency(handle, config.freq);
     lora_set_buffer_base(handle, 0x0, 0x0);
     lora_set_mod_params(handle, CONFIG_LORA_SF, CONFIG_LORA_BW, CONFIG_LORA_CR);
@@ -242,6 +257,55 @@ void lora_reset(const lora_handle* handle)
     vTaskDelay(pdMS_TO_TICKS(100));
 }
 
+void lora_standby(const lora_handle* handle)
+{
+    ESP_LOGV(TAG, "STANDBY");
+    uint8_t buf[2] = { CMD_SET_STANDBY, 0x0 };
+    write_spi(handle, buf, 2);
+}
+
+void lora_receive(const lora_handle* handle)
+{
+    ESP_LOGV(TAG, "RECEIVE");
+    uint8_t buf[4] = { CMD_SET_RX, 0xFF, 0xFF, 0xFF };
+    write_spi(handle, buf, 4);
+}
+
+void lora_transmit(const lora_handle* handle, uint32_t timeout)
+{
+    ESP_LOGV(TAG, "TRANSMIT");
+    uint8_t buf[4] = { CMD_SET_TX, (timeout >> 16) & 0xFF, (timeout >> 8) & 0xFF, timeout & 0xFF };
+    write_spi(handle, buf, 4);
+}
+
+void lora_set_sync_word(const lora_handle* handle, uint16_t sync_word)
+{
+    uint8_t buf[1] = { (sync_word >> 8) & 0xFF };
+    write_register(handle, REG_LORA_SYNC_WORD_MSB, buf, 1);
+    buf[0] = sync_word & 0xFF;
+    write_register(handle, REG_LORA_SYNC_WORD_LSB, buf, 1);
+    ESP_LOGI(TAG, "Sync Word: %04X", sync_word);
+}
+
+void lora_set_byte_sync_word(const lora_handle* handle, uint8_t sync_word)
+{
+    // Set Sync word to 0xY4Z4 where sync_word has the form 0xYZ
+    lora_set_sync_word(
+        handle, ((uint16_t)(sync_word & 0xF0) << 8) | ((sync_word & 0x0F) << 4) | 0x0404);
+}
+
+uint16_t lora_get_sync_word(const lora_handle* handle)
+{
+    uint8_t buf[1];
+    uint16_t sync_word = 0;
+    read_register(handle, REG_LORA_SYNC_WORD_MSB, buf, 1);
+    sync_word = buf[0] << 8;
+    read_register(handle, REG_LORA_SYNC_WORD_LSB, buf, 1);
+    sync_word |= buf[0];
+
+    return sync_word;
+}
+
 void lora_set_packet_type(const lora_handle* handle, uint8_t packet_type)
 {
     ESP_LOGV(TAG, "SET_PACKET_TYPE: %d", packet_type);
@@ -249,12 +313,22 @@ void lora_set_packet_type(const lora_handle* handle, uint8_t packet_type)
     write_spi(handle, data, 2);
 }
 
-uint8_t lora_get_packet_type(const lora_handle* handle)
+void lora_set_pa_config(
+    const lora_handle* handle, uint8_t pa_duty_cycle, uint8_t hp_max, uint8_t device_select)
 {
-    ESP_LOGV(TAG, "GET_PACKET_TYPE");
-    uint8_t data[3] = { CMD_GET_PACKET_TYPE, 0x0, 0x0 };
-    read_spi(handle, data, data, 3);
-    return data[2];
+    ESP_LOGV(TAG, "SET_PA_CONFIG: DUTY_CYCLE: %d HP MAX: %d DEVICE_SELECT %d", pa_duty_cycle,
+        hp_max, device_select);
+
+    uint8_t data[5] = { CMD_SET_PA_CONFIG, pa_duty_cycle, hp_max, device_select, 0x01 };
+    write_spi(handle, data, 5);
+}
+
+void lora_set_mod_params(const lora_handle* handle, uint8_t sf, uint8_t bw, uint8_t cr)
+{
+    ESP_LOGV(TAG, "SET_MOD_PARAMS: SF: %d BW: %d CR %d", sf, bw, cr);
+
+    uint8_t data[9] = { CMD_SET_MODULATION_PARAMS, sf, bw, cr, 0, 0, 0, 0, 0 };
+    write_spi(handle, data, 9);
 }
 
 void lora_set_frequency(lora_handle* handle, uint32_t freq)
@@ -273,12 +347,32 @@ void lora_set_frequency(lora_handle* handle, uint32_t freq)
     write_spi(handle, buf, 5);
 }
 
+void lora_set_packet_params(const lora_handle* handle, uint16_t preamble_length,
+    uint8_t header_type, uint8_t payload_length, uint8_t crc_type, int8_t invert_iq)
+{
+    ESP_LOGV(TAG,
+        "SET_PACKET_PARAMS: PREAMBLE_LENGTH:%d HEADER_TYPE: %d PAYLOAD_LENGTH %d CRC_TYPE: %d "
+        "INVERT_IQ:%d",
+        preamble_length, header_type, payload_length, crc_type, invert_iq);
+
+    uint8_t data[10] = { CMD_SET_PACKET_PARAMS, (preamble_length >> 8) & 0xFF,
+        preamble_length & 0xFF, header_type, payload_length, crc_type, invert_iq, 0x0, 0x0, 0x0 };
+    write_spi(handle, data, 10);
+}
+
 void lora_set_buffer_base(const lora_handle* handle, uint8_t tx_base, uint8_t rx_base)
 {
     ESP_LOGV(TAG, "SET_BUFFER_BASE: TX: %d, RX: %d", tx_base, rx_base);
     uint8_t buf[3] = { CMD_SET_BUFFER_BASE_ADDRESS, tx_base, rx_base };
 
     write_spi(handle, buf, 3);
+}
+
+void lora_write_tx_message(const lora_handle* handle, const uint8_t* buf, size_t len)
+{
+    lora_set_buffer_base(handle, 0, 0);
+
+    write_buffer(handle, 0, buf, len);
 }
 
 void lora_get_rx_buffer_status(
@@ -289,20 +383,6 @@ void lora_get_rx_buffer_status(
     read_spi(handle, buf, buf, 4);
     *payload_length  = buf[2];
     *rx_start_buffer = buf[3];
-}
-
-void lora_standby(const lora_handle* handle)
-{
-    ESP_LOGV(TAG, "STANDBY");
-    uint8_t buf[2] = { CMD_SET_STANDBY, 0x0 };
-    write_spi(handle, buf, 2);
-}
-
-void lora_receive(const lora_handle* handle)
-{
-    ESP_LOGV(TAG, "RECEIVE");
-    uint8_t buf[4] = { CMD_SET_RX, 0xFF, 0xFF, 0xFF };
-    write_spi(handle, buf, 4);
 }
 
 uint8_t lora_received_packet(const lora_handle* handle)
@@ -324,35 +404,6 @@ uint8_t lora_read_packet(const lora_handle* handle, uint8_t* data, uint8_t len)
     }
 
     return 0;
-}
-
-uint16_t lora_get_irq_status(const lora_handle* handle)
-{
-    // ESP_LOGV(TAG, "GET_IRQ_STATUS");
-    uint8_t buf[4] = { CMD_GET_IRQ_STATUS, 0x0, 0x0, 0x0 };
-    read_spi(handle, buf, buf, 4);
-
-    return (((uint16_t)buf[2]) << 8) | buf[3];
-}
-
-void lora_clear_irq_status(const lora_handle* handle, uint16_t irq)
-{
-    ESP_LOGV(TAG, "CLEAR_IRQ_STATUS: 0x%X", irq);
-    uint8_t buf[3] = { CMD_CLEAR_IRQ_STATUS, (irq >> 8) & 0xFF, irq & 0xFF };
-    write_spi(handle, buf, 3);
-}
-
-void lora_set_packet_params(const lora_handle* handle, uint16_t preamble_length,
-    uint8_t header_type, uint8_t payload_length, uint8_t crc_type, int8_t invert_iq)
-{
-    ESP_LOGV(TAG,
-        "SET_PACKET_PARAMS: PREAMBLE_LENGTH:%d HEADER_TYPE: %d PAYLOAD_LENGTH %d CRC_TYPE: %d "
-        "INVERT_IQ:%d",
-        preamble_length, header_type, payload_length, crc_type, invert_iq);
-
-    uint8_t data[10] = { CMD_SET_PACKET_PARAMS, (preamble_length >> 8) & 0xFF,
-        preamble_length & 0xFF, header_type, payload_length, crc_type, invert_iq, 0x0, 0x0, 0x0 };
-    write_spi(handle, data, 10);
 }
 
 void lora_get_packet_status(
@@ -386,42 +437,6 @@ int8_t lora_get_rssi_inst(const lora_handle* handle)
     return -((int8_t)data[2]) / 2;
 }
 
-void lora_set_sync_word(const lora_handle* handle, uint16_t sync_word)
-{
-    uint8_t buf[1] = { (sync_word >> 8) & 0xFF };
-    write_register(handle, REG_LORA_SYNC_WORD_MSB, buf, 1);
-    buf[0] = sync_word & 0xFF;
-    write_register(handle, REG_LORA_SYNC_WORD_LSB, buf, 1);
-    ESP_LOGI(TAG, "Sync Word: %04X", sync_word);
-}
-
-void lora_set_byte_sync_word(const lora_handle* handle, uint8_t sync_word)
-{
-    // Set Sync word to 0xY4Z4 where sync_word has the form 0xYZ
-    lora_set_sync_word(
-        handle, ((uint16_t)(sync_word & 0xF0) << 8) | ((sync_word & 0x0F) << 4) | 0x0404);
-}
-
-uint16_t lora_get_sync_word(const lora_handle* handle)
-{
-    uint8_t buf[1];
-    uint16_t sync_word = 0;
-    read_register(handle, REG_LORA_SYNC_WORD_MSB, buf, 1);
-    sync_word = buf[0] << 8;
-    read_register(handle, REG_LORA_SYNC_WORD_LSB, buf, 1);
-    sync_word |= buf[0];
-
-    return sync_word;
-}
-
-void lora_set_mod_params(const lora_handle* handle, uint8_t sf, uint8_t bw, uint8_t cr)
-{
-    ESP_LOGV(TAG, "SET_MOD_PARAMS: SF: %d BW: %d CR %d", sf, bw, cr);
-
-    uint8_t data[9] = { CMD_SET_MODULATION_PARAMS, sf, bw, cr, 0, 0, 0, 0, 0 };
-    write_spi(handle, data, 9);
-}
-
 void lora_set_dio_irq_params(const lora_handle* handle, uint16_t irq_mask)
 {
     ESP_LOGV(TAG, "SET_DIO_IRQ: IRQ_MASK: %x", irq_mask);
@@ -429,4 +444,20 @@ void lora_set_dio_irq_params(const lora_handle* handle, uint16_t irq_mask)
     uint8_t data[9]
         = { CMD_DIO_IRQ_PARAMS, (irq_mask >> 8) & 0xFF, (irq_mask) & 0xFF, 0, 0, 0, 0, 0, 0 };
     write_spi(handle, data, 9);
+}
+
+uint16_t lora_get_irq_status(const lora_handle* handle)
+{
+    // ESP_LOGV(TAG, "GET_IRQ_STATUS");
+    uint8_t buf[4] = { CMD_GET_IRQ_STATUS, 0x0, 0x0, 0x0 };
+    read_spi(handle, buf, buf, 4);
+
+    return (((uint16_t)buf[2]) << 8) | buf[3];
+}
+
+void lora_clear_irq_status(const lora_handle* handle, uint16_t irq)
+{
+    ESP_LOGV(TAG, "CLEAR_IRQ_STATUS: 0x%X", irq);
+    uint8_t buf[3] = { CMD_CLEAR_IRQ_STATUS, (irq >> 8) & 0xFF, irq & 0xFF };
+    write_spi(handle, buf, 3);
 }
