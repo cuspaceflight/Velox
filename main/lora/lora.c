@@ -113,7 +113,7 @@ void write_spi(const lora_handle* handle, uint8_t* tx, uint8_t buf_size)
 void read_register(const lora_handle* handle, uint16_t addr, uint8_t* buf, uint8_t buf_size)
 {
     ESP_LOGV(TAG, "READ_REG: 0x%04X", addr);
-    uint8_t data[16];
+    uint8_t data[buf_size + 4];
     memset(data, 0, sizeof(data));
     data[0] = CMD_READ_REGISTER;
     data[1] = (addr >> 8) & 0xFF;
@@ -135,19 +135,15 @@ uint8_t read_buffer(const lora_handle* handle, uint8_t* rx_buf, uint8_t len)
         return 0;
     }
 
-    uint8_t* buf = malloc(payload_length + 3);
-    if (!buf) {
-        ESP_LOGE(TAG, "ReadBuffer malloc fail");
-        return 0;
-    }
+    uint8_t tx[payload_length + 3];
+    uint8_t rx[payload_length + 3];
 
-    buf[0] = CMD_READ_BUFFER;
-    buf[1] = payload_offset;
-    buf[2] = 0x0;
-    memset(&buf[3], 0x0, payload_length);
-    read_spi(handle, buf, buf, payload_length + 3);
-    memcpy(rx_buf, &buf[3], payload_length);
-    free(buf);
+    tx[0] = CMD_READ_BUFFER;
+    tx[1] = payload_offset;
+    tx[2] = 0x0;
+    memset(&tx[3], 0x0, payload_length);
+    read_spi(handle, tx, rx, payload_length + 3);
+    memcpy(rx_buf, &rx[3], payload_length);
 
     return payload_length;
 }
@@ -168,7 +164,7 @@ void write_buffer(const lora_handle* handle, uint8_t offset, const uint8_t* tx_b
 void write_register(const lora_handle* handle, uint16_t addr, uint8_t* buf, uint8_t buf_size)
 {
     ESP_LOGV(TAG, "WRITE_REG: 0x%04X", addr);
-    uint8_t data[16];
+    uint8_t data[buf_size + 3];
 
     memset(data, 0, sizeof(data));
     data[0] = CMD_WRITE_REGISTER;
@@ -206,7 +202,7 @@ int lora_init(const lora_config config, lora_handle* handle)
         .quadhd_io_num = -1,
     };
 
-    ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_DISABLED));
+    ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO));
 
     spi_device_interface_config_t dev = {
         .clock_speed_hz = 1E5,
