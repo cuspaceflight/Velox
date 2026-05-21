@@ -17,7 +17,7 @@
 
 #define STRLEN 512
 
-uint8_t buf[64];
+uint8_t buf[200];
 char strbuf[STRLEN];
 
 lora_config lora_conf = {
