@@ -407,34 +407,34 @@ uint8_t lora_read_packet(const lora_handle* handle, uint8_t* data, uint8_t len)
 }
 
 void lora_get_packet_status(
-    const lora_handle* handle, int8_t* rssi, int8_t* snr, int8_t* signal_rssi)
+    const lora_handle* handle, int16_t* rssi, uint8_t* snr, int16_t* signal_rssi)
 {
     uint8_t data[5] = { CMD_GET_PACKET_STATUS, 0x0, 0x0, 0x0, 0x0 };
     read_spi(handle, data, data, 5);
 
     if (rssi != NULL)
-        *rssi = -((int8_t)data[2] / 2);
+        *rssi = -((int16_t)(data[2] / 2));
 
     if (snr != NULL)
-        *snr = ((int8_t)data[3]) / 4;
+        *snr = (data[3]) / 4;
 
     if (signal_rssi != NULL)
-        *signal_rssi = -(data[4] / 2);
+        *signal_rssi = -((int16_t)(data[4] / 2));
 }
 
-int8_t lora_get_packet_rssi(const lora_handle* handle)
+int16_t lora_get_packet_rssi(const lora_handle* handle)
 {
-    int8_t rssi;
+    int16_t rssi;
     lora_get_packet_status(handle, &rssi, NULL, NULL);
     return rssi;
 }
 
-int8_t lora_get_rssi_inst(const lora_handle* handle)
+int16_t lora_get_rssi_inst(const lora_handle* handle)
 {
     uint8_t data[3] = { CMD_GET_RSSI_INST, 0x0, 0x0 };
     read_spi(handle, data, data, 3);
 
-    return -((int8_t)data[2]) / 2;
+    return -((int16_t)(data[2]) / 2);
 }
 
 void lora_set_dio_irq_params(const lora_handle* handle, uint16_t irq_mask)

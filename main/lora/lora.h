@@ -48,9 +48,9 @@ uint8_t lora_received_packet(const lora_handle* device);
 uint8_t lora_read_packet(const lora_handle* device, uint8_t* data, uint8_t len);
 
 void lora_get_packet_status(
-    const lora_handle* handle, int8_t* rssi, int8_t* snr, int8_t* signal_rssi);
-int8_t lora_get_packet_rssi(const lora_handle* device);
-int8_t lora_get_rssi_inst(const lora_handle* device);
+    const lora_handle* handle, int16_t* rssi, uint8_t* snr, int16_t* signal_rssi);
+int16_t lora_get_packet_rssi(const lora_handle* device);
+int16_t lora_get_rssi_inst(const lora_handle* device);
 
 void lora_set_dio_irq_params(const lora_handle* handle, uint16_t irq_mask);
 
