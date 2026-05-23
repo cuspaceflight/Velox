@@ -15,9 +15,9 @@
 #include <freertos/task.h>
 #include <stdio.h>
 
-#define STRLEN 512
+#define STRLEN 1024
 
-uint8_t buf[200];
+uint8_t buf[255];
 char strbuf[STRLEN];
 
 lora_config lora_conf = {

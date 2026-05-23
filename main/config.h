@@ -3,26 +3,28 @@
 #include "lora/lora.h"
 #include "oled/oled.h"
 
+#include <math.h>
+
 #include "esp_log.h"
 
 static const char* json_resp = R"RAWSTRING(
 {
 "TIME": "%lu",
 "ENTR": "%lu",
-"GLAT": "%f",
-"GLON": "%f",
+"GLAT": "%14.06f",
+"GLON": "%15.06f",
 "GALT": "%f",
 "GSPD": "%f",
 "BTEM": "%f",
 "BPRE": "%f",
 "BALT": "%f",
-"ITEM": "%f"
+"ITEM": "%f",
 "IACX": "%f",
 "IACY": "%f",
 "IACZ": "%f",
 "IGYX": "%f",
 "IGYY": "%f",
-"IGYZ": "%f",
+"IGYZ": "%f"
 }
 )RAWSTRING";
 
@@ -47,23 +49,29 @@ typedef struct lora_message_t {
 
 void render_oled(const lora_handle* lora, const oled_handle* oled, const lora_message message)
 {
-    // static float s_gps_lat = 0.0f, s_gps_lon = 0.0f, s_gps_alt = 0.0f;
-    //
-    // if (message.gps_lat != 0.0f) {
-    //     s_gps_lat = message.gps_lat;
-    //     s_gps_lon = message.gps_lon;
-    //     s_gps_alt = message.gps_alt;
-    // }
+    static float s_gps_lat = 0.0f, s_gps_lon = 0.0f, s_gps_alt = 0.0f;
+
+    if (message.gps_lat != 0.0f) {
+        s_gps_lat = message.gps_lat;
+        s_gps_lon = message.gps_lon;
+        s_gps_alt = message.gps_alt;
+    }
 
     int8_t rssi = lora_get_packet_rssi(lora);
     oled_set_text(oled, 3, 15 * 6, "%dMHz", (lora->freq) / (uint32_t)1e6);
 
+    oled_set_text(oled, 0, 0, "LAT : %-3d %2d %7.5f", (int)floorf(s_gps_lat / 10000),
+        (int)floorf(s_gps_lat / 100.f) % 100, fmodf(s_gps_lat, 100.f));
+
+    oled_set_text(oled, 1, 0, "LON : %-3d %2d %7.5f", (int)floorf(s_gps_lon / 10000),
+        (int)floorf(s_gps_lon / 100.f) % 100, fmodf(s_gps_lon, 100.f));
+
+    oled_set_text(oled, 2, 0, "ALT : %-7.3f", s_gps_alt);
     // oled_set_text(oled, 0, 0, "LAT : %-9.6f", s_gps_lat);
     // oled_set_text(oled, 1, 0, "LON : %-9.6f", s_gps_lon);
-    // oled_set_text(oled, 2, 0, "ALT : %-9.6f", s_gps_alt);
-    oled_set_text(oled, 0, 0, "Y   : %-5.3f", message.icm_accel_y);
-    oled_set_text(oled, 1, 0, "TEMP: %-5.3f", message.icm_temp);
-    oled_set_text(oled, 2, 0, "ALT : %-5.3f", message.bmp_altitude);
+    // oled_set_text(oled, 0, 0, "Y   : %-5.3f", message.icm_accel_y);
+    // oled_set_text(oled, 1, 0, "TEMP: %-5.3f", message.icm_temp);
+    // oled_set_text(oled, 2, 0, "ALT : %-5.3f", message.bmp_altitude);
     oled_set_text(oled, 3, 0, "RSSI: %-3d", rssi);
 }
 
